@@ -7,11 +7,20 @@
 
 #include "mpiimpl.h"
 #include "datatype.h"
+#include "mpiu_timer.h"
+
+
+//Added by connoisseur
+#include "../../../modules/src/profile.h"
 
 #define COPY_BUFFER_SZ 16384
 #if !defined(MPIC_REQUEST_PTR_ARRAY_SIZE)
 #define MPIC_REQUEST_PTR_ARRAY_SIZE 64
 #endif
+
+
+void (*MPIC_Send_Hook) (double timediff)=NULL;
+//void (*MPIC_Recv_Hook) (int count, MPI_Datatype type, int src)=NULL;
 
 /* These functions are used in the implementation of collective
    operations. They are wrappers around MPID send/recv functions. They do
@@ -271,6 +280,14 @@ int MPIC_Wait(MPID_Request * request_ptr, MPIR_Errflag_t *errflag)
 int MPIC_Send(const void *buf, MPI_Aint count, MPI_Datatype datatype, int dest, int tag,
                  MPID_Comm *comm_ptr, MPIR_Errflag_t *errflag)
 {
+
+    //Added by connoisseur
+    MPIU_Time_t t_start, t_end;
+    double timediff;
+    MPIU_Wtime(&t_start);
+    //------------
+
+
     int mpi_errno = MPI_SUCCESS;
     int context_id;
     MPID_Request *request_ptr = NULL;
@@ -304,6 +321,13 @@ int MPIC_Send(const void *buf, MPI_Aint count, MPI_Datatype datatype, int dest, 
         MPID_Request_release(request_ptr);
     }
 
+    MPIU_Wtime(&t_end);
+    MPIU_Wtime_diff(&t_start, &t_end, &timediff);
+
+    //Added by connoisseur
+    if(MPIC_Send_Hook){
+        MPIC_Send_Hook(timediff);  
+    }
  fn_exit:
     MPIU_DBG_MSG_D(PT2PT, TYPICAL, "OUT: errflag = %d", *errflag);
     MPIDI_FUNC_EXIT(MPID_STATE_MPIC_SEND);
@@ -318,6 +342,8 @@ int MPIC_Send(const void *buf, MPI_Aint count, MPI_Datatype datatype, int dest, 
             *errflag = MPIR_ERR_OTHER;
         }
     }
+    //ToDo connsosiieur
+
     goto fn_exit;
     /* --END ERROR HANDLING-- */
 }
